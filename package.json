@@ -10,6 +10,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:studio": "prisma studio",
+    "desktop:prepare": "npm run build && node scripts/prepare-tauri-bundle.mjs",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -21,6 +24,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
