@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Item {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique
+  averageZenny  Int
+  divinePrideId Int?
+  isSoldToNpc   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  instanceItems InstanceItem[]
+  farmRunItems  FarmRunItem[]
+
+  @@index([name])
+  @@index([averageZenny])
+}
+
+model Instance {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  minimumLevel  Int
+  cooldownDays  Int
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  instanceItems InstanceItem[]
+  farmRuns      FarmRun[]
+
+  @@index([name])
+  @@index([minimumLevel])
+  @@index([cooldownDays])
+}
+
+model InstanceItem {
+  instanceId Int
+  itemId     Int
+  instance   Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([instanceId, itemId])
+  @@index([itemId])
+}
+
+model Character {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  level     Int
+  classId   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  farmRuns  FarmRun[]
+
+  @@index([name])
+  @@index([level])
+  @@index([classId])
+}
+
+model FarmRun {
+  id              Int           @id @default(autoincrement())
+  characterId     Int
+  instanceId      Int
+  executedAt      DateTime
+  operationalDate String
+  nextAvailableAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  character       Character     @relation(fields: [characterId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  instance        Instance      @relation(fields: [instanceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  items           FarmRunItem[]
+
+  @@index([characterId])
+  @@index([instanceId])
+  @@index([executedAt])
+  @@index([operationalDate])
+  @@index([nextAvailableAt])
+}
+
+model FarmRunItem {
+  farmRunId Int
+  itemId    Int
+  quantity  Int
+  farmRun   FarmRun @relation(fields: [farmRunId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  item      Item    @relation(fields: [itemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([farmRunId, itemId])
+  @@index([itemId])
+}

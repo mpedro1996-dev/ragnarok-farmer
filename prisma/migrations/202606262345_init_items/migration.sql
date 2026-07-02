@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS "Item" (
+  "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  "name" TEXT NOT NULL,
+  "averageZenny" INTEGER NOT NULL,
+  "divinePrideId" INTEGER,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Item_name_key" ON "Item"("name");
+CREATE INDEX IF NOT EXISTS "Item_name_idx" ON "Item"("name");
+CREATE INDEX IF NOT EXISTS "Item_averageZenny_idx" ON "Item"("averageZenny");
