@@ -3,6 +3,7 @@ import { z, ZodError } from "zod";
 import {
   deleteItem,
   DuplicateItemNameError,
+  getItemDetail,
   ItemInUseError,
   ItemNotFoundError,
   updateItem,
@@ -16,6 +17,18 @@ type RouteContext = {
 };
 
 const itemIdSchema = z.coerce.number().int().positive();
+
+export async function GET(_request: Request, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    const itemId = parseItemId(id);
+    const detail = await getItemDetail(itemId);
+
+    return Response.json(detail);
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
 
 export async function PUT(request: Request, context: RouteContext) {
   try {

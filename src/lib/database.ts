@@ -22,6 +22,20 @@ const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS "Item_name_idx" ON "Item"("name")`,
   `CREATE INDEX IF NOT EXISTS "Item_averageZenny_idx" ON "Item"("averageZenny")`,
   `
+    CREATE TABLE IF NOT EXISTS "ItemPriceHistory" (
+      "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      "itemId" INTEGER NOT NULL,
+      "previousAverageZenny" INTEGER NOT NULL,
+      "nextAverageZenny" INTEGER NOT NULL,
+      "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ItemPriceHistory_itemId_fkey"
+        FOREIGN KEY ("itemId") REFERENCES "Item" ("id")
+        ON DELETE CASCADE ON UPDATE CASCADE
+    )
+  `,
+  `CREATE INDEX IF NOT EXISTS "ItemPriceHistory_itemId_idx" ON "ItemPriceHistory"("itemId")`,
+  `CREATE INDEX IF NOT EXISTS "ItemPriceHistory_createdAt_idx" ON "ItemPriceHistory"("createdAt")`,
+  `
     CREATE TABLE IF NOT EXISTS "Instance" (
       "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
       "name" TEXT NOT NULL,
@@ -111,6 +125,7 @@ export async function ensureDatabaseSchema() {
       )
       .then(async () => {
         await ensureItemNpcColumn();
+        await ensureItemPriceHistoryTable();
       });
   }
 
@@ -129,4 +144,27 @@ async function ensureItemNpcColumn() {
       `ALTER TABLE "Item" ADD COLUMN "isSoldToNpc" BOOLEAN NOT NULL DEFAULT false`,
     );
   }
+}
+
+async function ensureItemPriceHistoryTable() {
+  await prisma.$transaction([
+    prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ItemPriceHistory" (
+        "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        "itemId" INTEGER NOT NULL,
+        "previousAverageZenny" INTEGER NOT NULL,
+        "nextAverageZenny" INTEGER NOT NULL,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "ItemPriceHistory_itemId_fkey"
+          FOREIGN KEY ("itemId") REFERENCES "Item" ("id")
+          ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `),
+    prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "ItemPriceHistory_itemId_idx" ON "ItemPriceHistory"("itemId")`,
+    ),
+    prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS "ItemPriceHistory_createdAt_idx" ON "ItemPriceHistory"("createdAt")`,
+    ),
+  ]);
 }

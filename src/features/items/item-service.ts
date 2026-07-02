@@ -57,12 +57,64 @@ export async function createItem(input: ItemInput) {
   }
 }
 
+export async function getItemDetail(id: number) {
+  await ensureDatabaseSchema();
+
+  const item = await prisma.item.findUnique({
+    where: { id },
+    include: {
+      priceHistory: {
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+    },
+  });
+
+  if (!item) {
+    throw new ItemNotFoundError();
+  }
+
+  return {
+    item: {
+      id: item.id,
+      name: item.name,
+      averageZenny: item.averageZenny,
+      divinePrideId: item.divinePrideId,
+      isSoldToNpc: item.isSoldToNpc,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    },
+    priceHistory: item.priceHistory,
+  };
+}
+
 export async function updateItem(id: number, input: ItemInput) {
   await ensureDatabaseSchema();
   try {
-    return await prisma.item.update({
-      where: { id },
-      data: input,
+    return await prisma.$transaction(async (transaction) => {
+      const existingItem = await transaction.item.findUnique({
+        where: { id },
+      });
+
+      if (!existingItem) {
+        throw new ItemNotFoundError();
+      }
+
+      if (existingItem.averageZenny !== input.averageZenny) {
+        await transaction.itemPriceHistory.create({
+          data: {
+            itemId: existingItem.id,
+            previousAverageZenny: existingItem.averageZenny,
+            nextAverageZenny: input.averageZenny,
+          },
+        });
+      }
+
+      return transaction.item.update({
+        where: { id },
+        data: input,
+      });
     });
   } catch (error) {
     throw mapPrismaError(error);

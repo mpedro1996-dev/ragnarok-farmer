@@ -29,8 +29,21 @@ type ItemRecord = {
   updatedAt: string;
 };
 
+type ItemPriceHistoryRecord = {
+  id: number;
+  itemId: number;
+  previousAverageZenny: number;
+  nextAverageZenny: number;
+  createdAt: string;
+};
+
 type ItemsResponse = {
   items: ItemRecord[];
+};
+
+type ItemDetailResponse = {
+  item: ItemRecord;
+  priceHistory: ItemPriceHistoryRecord[];
 };
 
 type FeedbackState =
@@ -87,6 +100,25 @@ async function requestItems(
   };
 }
 
+async function requestItemDetail(itemId: number) {
+  const response = await fetch(`/api/items/${itemId}`);
+  const payload = (await response.json()) as ItemDetailResponse | ApiErrorPayload;
+
+  if (!response.ok) {
+    throw new Error(
+      getApiErrorMessage(
+        payload as ApiErrorPayload,
+        "Não foi possível carregar o histórico do item.",
+      ),
+    );
+  }
+
+  return {
+    item: normalizeItemRecord((payload as ItemDetailResponse).item),
+    priceHistory: (payload as ItemDetailResponse).priceHistory,
+  };
+}
+
 export function ItemsAdminClient() {
   const [items, setItems] = useState<ItemRecord[]>([]);
   const [search, setSearch] = useState("");
@@ -98,6 +130,8 @@ export function ItemsAdminClient() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemRecord | null>(null);
+  const [priceHistory, setPriceHistory] = useState<ItemPriceHistoryRecord[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [formValues, setFormValues] = useState<FormValues>(emptyForm);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [itemPendingDelete, setItemPendingDelete] = useState<ItemRecord | null>(
@@ -106,6 +140,7 @@ export function ItemsAdminClient() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const firstLoadRef = useRef(true);
+  const itemDetailRequestRef = useRef(0);
 
   async function refreshItems(isInitialLoad: boolean) {
     if (isInitialLoad) {
@@ -149,14 +184,22 @@ export function ItemsAdminClient() {
   }, [deferredSearch, sortBy, sortOrder]);
 
   function openCreateModal() {
+    itemDetailRequestRef.current += 1;
     setEditingItem(null);
+    setPriceHistory([]);
+    setIsHistoryLoading(false);
     setFormValues(emptyForm);
     setFormErrors({});
     setIsFormOpen(true);
   }
 
-  function openEditModal(item: ItemRecord) {
+  async function openEditModal(item: ItemRecord) {
+    const requestId = itemDetailRequestRef.current + 1;
+    itemDetailRequestRef.current = requestId;
+
     setEditingItem(item);
+    setPriceHistory([]);
+    setIsHistoryLoading(true);
     setFormValues({
       name: item.name,
       averageZenny: String(item.averageZenny),
@@ -165,6 +208,41 @@ export function ItemsAdminClient() {
     });
     setFormErrors({});
     setIsFormOpen(true);
+
+    try {
+      const detail = await requestItemDetail(item.id);
+
+      if (itemDetailRequestRef.current !== requestId) {
+        return;
+      }
+
+      setEditingItem(detail.item);
+      setPriceHistory(detail.priceHistory);
+      setFormValues({
+        name: detail.item.name,
+        averageZenny: String(detail.item.averageZenny),
+        divinePrideId: detail.item.divinePrideId
+          ? String(detail.item.divinePrideId)
+          : "",
+        isSoldToNpc: Boolean(detail.item.isSoldToNpc),
+      });
+    } catch (error) {
+      if (itemDetailRequestRef.current !== requestId) {
+        return;
+      }
+
+      setFeedback({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível carregar o histórico do item.",
+      });
+    } finally {
+      if (itemDetailRequestRef.current === requestId) {
+        setIsHistoryLoading(false);
+      }
+    }
   }
 
   function closeFormModal() {
@@ -172,8 +250,11 @@ export function ItemsAdminClient() {
       return;
     }
 
+    itemDetailRequestRef.current += 1;
     setIsFormOpen(false);
     setEditingItem(null);
+    setPriceHistory([]);
+    setIsHistoryLoading(false);
     setFormErrors({});
   }
 
@@ -249,6 +330,8 @@ export function ItemsAdminClient() {
 
       setIsFormOpen(false);
       setEditingItem(null);
+      setPriceHistory([]);
+      setIsHistoryLoading(false);
       setFormValues(emptyForm);
       setFormErrors({});
       setFeedback({
@@ -478,7 +561,9 @@ export function ItemsAdminClient() {
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={() => openEditModal(item)}
+                              onClick={() => {
+                                void openEditModal(item);
+                              }}
                               className="rounded-full border border-[var(--border-default)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
                             >
                               Editar
@@ -545,7 +630,9 @@ export function ItemsAdminClient() {
                           <div className="flex justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => openEditModal(item)}
+                              onClick={() => {
+                                void openEditModal(item);
+                              }}
                               className="rounded-full border border-[var(--border-default)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]"
                             >
                               Editar
@@ -571,7 +658,12 @@ export function ItemsAdminClient() {
 
       {isFormOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/55 p-4 md:items-center">
-          <div className="w-full max-w-xl rounded-[28px] border border-white/60 bg-[var(--surface-elevated)] p-6 shadow-[0_24px_80px_rgba(15,23,42,0.25)]">
+          <div
+            className={[
+              "w-full rounded-[28px] border border-white/60 bg-[var(--surface-elevated)] p-6 shadow-[0_24px_80px_rgba(15,23,42,0.25)]",
+              editingItem ? "max-w-[1080px]" : "max-w-xl",
+            ].join(" ")}
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-[var(--text-primary)]">
@@ -592,6 +684,14 @@ export function ItemsAdminClient() {
             </div>
 
             <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+              <div
+                className={
+                  editingItem
+                    ? "grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start"
+                    : "space-y-5"
+                }
+              >
+              <div className="space-y-5">
               <Field
                 label="Nome"
                 error={formErrors.name}
@@ -645,6 +745,17 @@ export function ItemsAdminClient() {
                 checked={formValues.isSoldToNpc}
                 onChange={(checked) => updateFormValue("isSoldToNpc", checked)}
               />
+                </div>
+
+              {editingItem ? (
+                <div className="min-h-0 xl:h-[396px]">
+                  <PriceHistoryPanel
+                    priceHistory={priceHistory}
+                    isLoading={isHistoryLoading}
+                  />
+                </div>
+              ) : null}
+              </div>
 
               <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
                 <button
@@ -775,18 +886,25 @@ function normalizeItemRecord(item: ItemRecord) {
 }
 
 function Field({
+  className,
   label,
   help,
   error,
   input,
 }: {
+  className?: string;
   label: string;
   help?: string;
   error?: string;
   input: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-2 text-sm font-medium text-[var(--text-primary)]">
+    <label
+      className={[
+        "flex flex-col gap-2 text-sm font-medium text-[var(--text-primary)]",
+        className ?? "",
+      ].join(" ")}
+    >
       {label}
       {input}
       {help ? <span className="text-xs text-[var(--text-secondary)]">{help}</span> : null}
@@ -796,12 +914,14 @@ function Field({
 }
 
 function CheckboxField({
+  className,
   label,
   help,
   error,
   checked,
   onChange,
 }: {
+  className?: string;
   label: string;
   help?: string;
   error?: string;
@@ -809,7 +929,7 @@ function CheckboxField({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className={["space-y-2", className ?? ""].join(" ")}>
       <label className="flex items-start gap-3 rounded-2xl border border-[var(--border-default)] bg-white px-4 py-3 text-sm font-medium text-[var(--text-primary)] transition hover:bg-[var(--surface-subtle)]">
         <input
           type="checkbox"
@@ -832,6 +952,59 @@ function CheckboxField({
         </span>
       ) : null}
     </div>
+  );
+}
+
+function PriceHistoryPanel({
+  priceHistory,
+  isLoading,
+}: {
+  priceHistory: ItemPriceHistoryRecord[];
+  isLoading: boolean;
+}) {
+  return (
+    <section className="flex h-full min-h-[320px] flex-col space-y-3 overflow-hidden rounded-[24px] border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/45 p-4 xl:min-h-0">
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+          Histórico de preço
+        </h3>
+        <p className="text-xs text-[var(--text-secondary)]">
+          Alterações reais do valor médio em zenny, da mais recente para a mais antiga.
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          {[1, 2, 3].map((entry) => (
+            <div
+              key={entry}
+              className="h-14 animate-pulse rounded-2xl bg-white/80"
+            />
+          ))}
+        </div>
+      ) : priceHistory.length === 0 ? (
+        <div className="flex min-h-[120px] flex-1 items-center rounded-2xl border border-dashed border-[var(--border-default)] bg-white/80 px-4 py-3 text-sm text-[var(--text-secondary)] xl:min-h-0">
+          Nenhuma alteração de preço registrada.
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          {priceHistory.map((entry) => (
+            <article
+              key={entry.id}
+              className="rounded-2xl border border-[var(--border-subtle)] bg-white px-4 py-3"
+            >
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                {formatZenny(entry.previousAverageZenny)} {"->"}{" "}
+                {formatZenny(entry.nextAverageZenny)}
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                {formatDateTimePtBr(entry.createdAt)}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -933,4 +1106,11 @@ function inputClassName(hasError: boolean) {
       ? "border-rose-300 focus:border-rose-300"
       : "border-[var(--border-default)] focus:border-[var(--border-focus)]",
   ].join(" ");
+}
+
+function formatDateTimePtBr(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
 }

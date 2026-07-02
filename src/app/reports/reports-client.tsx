@@ -246,10 +246,13 @@ export function ReportsClient({ initialData }: { initialData: FarmReportResponse
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <MetricCard label="Itens no filtro" value={String(rows.length)} />
                 <MetricCard label="Quantidade" value={formatZenny(totals.totalQuantity)} />
-                <MetricCard label="Valor total" value={formatZenny(totals.totalValue)} />
+                <MetricCard
+                  label="Valor total"
+                  value={formatReportCurrency(totals.totalValue)}
+                />
                 <MetricCard
                   label="Com superfaturar"
-                  value={formatZenny(totals.totalOverchargeValue)}
+                  value={formatReportCurrency(totals.totalOverchargeValue)}
                 />
               </div>
             </div>
@@ -553,12 +556,10 @@ export function ReportsClient({ initialData }: { initialData: FarmReportResponse
                         {formatZenny(row.totalQuantity)}
                       </td>
                       <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
-                        {formatZenny(row.totalValue)}
+                        {formatReportCurrency(row.totalValue)}
                       </td>
                       <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
-                        {row.overchargeTotalValue === null
-                          ? "-"
-                          : formatZenny(row.overchargeTotalValue)}
+                        {formatReportCurrency(row.overchargeTotalValue)}
                       </td>
                     </tr>
                   ))}
@@ -575,10 +576,10 @@ export function ReportsClient({ initialData }: { initialData: FarmReportResponse
                       {formatZenny(totals.totalQuantity)}
                     </td>
                     <td className="px-6 py-4 text-sm font-semibold text-[var(--text-primary)]">
-                      {formatZenny(totals.totalValue)}
+                      {formatReportCurrency(totals.totalValue)}
                     </td>
                     <td className="px-6 py-4 text-sm font-semibold text-[var(--text-primary)]">
-                      {formatZenny(totals.totalOverchargeValue)}
+                      {formatReportCurrency(totals.totalOverchargeValue)}
                     </td>
                   </tr>
                 </tfoot>
@@ -966,4 +967,12 @@ function getApiErrorMessage(payload: ApiErrorPayload | null, fallback: string) {
   }
 
   return fallback;
+}
+
+function formatReportCurrency(value: number | null) {
+  if (value === null || value === 0) {
+    return "-";
+  }
+
+  return formatZenny(value);
 }

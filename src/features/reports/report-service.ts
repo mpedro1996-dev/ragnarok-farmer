@@ -204,7 +204,7 @@ async function listAggregatedRows(
     const averageZenny = Number(row.averageZenny);
     const totalQuantity = Number(row.totalQuantity);
     const isSoldToNpc = normalizeBoolean(row.isSoldToNpc);
-    const totalValue = averageZenny * totalQuantity;
+    const totalValue = isSoldToNpc ? 0 : averageZenny * totalQuantity;
     const overchargeUnitValue = isSoldToNpc ? Math.floor(averageZenny * 1.24) : null;
     const overchargeTotalValue =
       overchargeUnitValue !== null ? overchargeUnitValue * totalQuantity : null;

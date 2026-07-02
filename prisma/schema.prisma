@@ -17,9 +17,22 @@ model Item {
   updatedAt     DateTime @updatedAt
   instanceItems InstanceItem[]
   farmRunItems  FarmRunItem[]
+  priceHistory  ItemPriceHistory[]
 
   @@index([name])
   @@index([averageZenny])
+}
+
+model ItemPriceHistory {
+  id                   Int      @id @default(autoincrement())
+  itemId               Int
+  previousAverageZenny Int
+  nextAverageZenny     Int
+  createdAt            DateTime @default(now())
+  item                 Item     @relation(fields: [itemId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([itemId])
+  @@index([createdAt])
 }
 
 model Instance {
